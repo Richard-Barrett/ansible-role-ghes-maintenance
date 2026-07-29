@@ -107,10 +107,10 @@ a licensed appliance, VM, or container:
 ```bash
 make setup
 make molecule
+make test
 ```
 
 The `default` scenario exercises a complete successful upgrade. The
 `guardrails` scenario checks that missing operator confirmation and unsupported
 cluster topology are rejected. See
 [`molecule/README.md`](molecule/README.md) for individual scenario commands.
-

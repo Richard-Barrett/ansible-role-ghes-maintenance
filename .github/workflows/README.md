@@ -7,9 +7,14 @@ stored in the repository.
 
 ## Publishing the role
 
-`publish.yml` re-imports this GitHub repository into Ansible Galaxy whenever a
-GitHub release is published. This repository is a role, not a collection, so it
-uses `ansible-galaxy role import` and does not build a collection archive.
+`tag.yml` creates a semantic-version tag after a successful push to `main`.
+GitHub suppresses new push events produced with `GITHUB_TOKEN`, so the remaining
+automation uses workflow-completion events: `release.yml` runs after `Tag`, and
+`publish.yml` runs after `Release`.
+
+`publish.yml` then re-imports this GitHub repository into Ansible Galaxy. This
+repository is a role, not a collection, so it uses
+`ansible-galaxy role import` and does not build a collection archive.
 
 Sign in to [Ansible Galaxy](https://galaxy.ansible.com/) with the GitHub account
 that owns this repository. Then open **Collections → API Token**, select
