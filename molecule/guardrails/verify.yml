@@ -1,0 +1,16 @@
+---
+- name: Verify guardrails
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read persisted guardrail results
+      ansible.builtin.include_vars:
+        file: "/tmp/ansible-role-ghes-maintenance-guardrails/results.yml"
+        name: molecule_guardrails
+
+    - name: Verify unsafe inputs were rejected
+      ansible.builtin.assert:
+        that:
+          - molecule_guardrails.confirmation | bool
+          - molecule_guardrails.topology | bool
+        fail_msg: "One or more required GHES upgrade guardrails did not reject unsafe input."

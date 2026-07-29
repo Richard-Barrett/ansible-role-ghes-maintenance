@@ -1,0 +1,35 @@
+---
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: default
+
+platforms:
+  - name: ghes-guardrails
+    options:
+      ansible_connection: local
+
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      ghes-guardrails:
+        ansible_connection: local
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - converge
+    - verify
+    - cleanup
+    - destroy

@@ -1,0 +1,37 @@
+---
+name: "Publish role to Ansible Galaxy"
+
+"on":
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: ansible-galaxy
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Ansible Core
+        run: python -m pip install "ansible-core>=2.18,<2.20"
+
+      - name: Import released role into Ansible Galaxy
+        env:
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          if [ -z "${GALAXY_API_KEY}" ]; then
+            printf '%s\n' 'The GALAXY_API_KEY GitHub environment secret is required.'
+            exit 1
+          fi
+          ansible-galaxy role import \
+            --token "${GALAXY_API_KEY}" \
+            --role-name ghes_upgrade \
+            Richard-Barrett \
+            ansible-role-ghes-maintenance

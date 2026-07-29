@@ -1,0 +1,76 @@
+---
+- name: Prepare mocked GHES commands
+  hosts: all
+  gather_facts: false
+  vars:
+    molecule_test_root: "/tmp/ansible-role-ghes-maintenance-default"
+    molecule_mock_bin: "{{ molecule_test_root }}/bin"
+  tasks:
+    - name: Create test directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ molecule_mock_bin }}"
+        - "{{ molecule_test_root }}/artifacts"
+        - "{{ molecule_test_root }}/async"
+
+    - name: Set the initial mocked GHES version
+      ansible.builtin.copy:
+        dest: "{{ molecule_test_root }}/version"
+        content: "3.20.4\n"
+        mode: "0644"
+
+    - name: Create a non-empty mocked upgrade package
+      ansible.builtin.copy:
+        dest: "{{ molecule_test_root }}/github-enterprise-3.21.1.pkg"
+        content: "mock GHES upgrade package\n"
+        mode: "0644"
+
+    - name: Install mocked GHES commands
+      ansible.builtin.copy:
+        dest: "{{ molecule_mock_bin }}/{{ item.name }}"
+        content: "{{ item.content }}"
+        mode: "0755"
+      loop:
+        - name: ghe-version
+          content: |
+            #!/bin/sh
+            printf 'GitHub Enterprise Server %s\n' "$(cat "${MOCK_GHES_ROOT}/version")"
+        - name: ghe-config-check
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'Configuration is valid'
+        - name: ghe-check-background-upgrade-jobs
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'All background upgrade jobs are complete'
+        - name: ghe-check-disk-usage
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'Disk usage checks passed'
+        - name: ghe-maintenance
+          content: |
+            #!/bin/sh
+            printf '%s\n' "$*" >> "${MOCK_GHES_ROOT}/maintenance.log"
+        - name: ghe-upgrade
+          content: |
+            #!/bin/sh
+            printf '%s\n' "${MOCK_GHES_TARGET_VERSION}" > "${MOCK_GHES_ROOT}/version"
+            printf '%s\n' "$*" > "${MOCK_GHES_ROOT}/upgrade.log"
+        - name: df
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'Filesystem 1048576-blocks Used Available Capacity Mounted on'
+            for argument in "$@"; do
+              case "$argument" in
+                -*) ;;
+                *) printf 'mockfs 100000 1000 99000 1%% %s\n' "$argument" ;;
+              esac
+            done
+
+    - name: Ensure stale maintenance history is absent
+      ansible.builtin.file:
+        path: "{{ molecule_test_root }}/maintenance.log"
+        state: absent

@@ -56,14 +56,18 @@
   changed_when: false
 
 - name: Collect root filesystem statistics
-  ansible.builtin.shell: "df -Pm / | awk 'NR==2 {gsub(/%/,\"\",$5); print $4, $5}'"
+  ansible.builtin.shell: |
+    set -o pipefail
+    df -Pm / | awk 'NR==2 {gsub(/%/,"",$5); print $4, $5}'
   args:
     executable: /bin/bash
   register: ghes_upgrade_root_df
   changed_when: false
 
 - name: Collect data filesystem statistics
-  ansible.builtin.shell: "df -Pm /data/user | awk 'NR==2 {gsub(/%/,\"\",$5); print $4, $5}'"
+  ansible.builtin.shell: |
+    set -o pipefail
+    df -Pm /data/user | awk 'NR==2 {gsub(/%/,"",$5); print $4, $5}'
   args:
     executable: /bin/bash
   register: ghes_upgrade_data_df

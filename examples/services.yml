@@ -1,0 +1,74 @@
+---
+- name: Inspect or restart GHES services
+  hosts: ghes-primary
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+
+  vars:
+    service_action: "status"
+    service_restart_confirm: false
+    service_restart_command: ""
+    service_external_url: ""
+    service_validate_certs: true
+    service_healthy_status_codes:
+      - 200
+      - 301
+      - 302
+      - 401
+      - 403
+
+  tasks:
+    - name: Validate requested service action
+      ansible.builtin.assert:
+        that:
+          - service_action in ['status', 'restart_core']
+        fail_msg: "Set service_action to status or restart_core."
+
+    - name: List GHES services before the requested action
+      ansible.builtin.command: ghe-service-list
+      register: service_status_before
+      changed_when: false
+
+    - name: Display current GHES service status
+      ansible.builtin.debug:
+        var: service_status_before.stdout_lines
+
+    - name: Validate guarded service restart
+      ansible.builtin.assert:
+        that:
+          - service_restart_confirm | bool
+          - service_restart_command | length > 0
+        fail_msg: >-
+          A restart requires service_restart_confirm=true and a
+          GitHub Support-approved service_restart_command.
+      when: service_action == 'restart_core'
+
+    - name: Run the approved service restart command
+      ansible.builtin.command: "{{ service_restart_command }}"
+      when: service_action == 'restart_core'
+      changed_when: true
+
+    - name: List GHES services after restart
+      ansible.builtin.command: ghe-service-list
+      register: service_status_after
+      changed_when: false
+      when: service_action == 'restart_core'
+
+    - name: Display resulting GHES service status
+      ansible.builtin.debug:
+        var: service_status_after.stdout_lines
+      when: service_action == 'restart_core'
+
+    - name: Check the external GHES URL after restart
+      ansible.builtin.uri:
+        url: "{{ service_external_url }}"
+        method: GET
+        validate_certs: "{{ service_validate_certs }}"
+        status_code: "{{ service_healthy_status_codes }}"
+        return_content: false
+      delegate_to: localhost
+      become: false
+      when:
+        - service_action == 'restart_core'
+        - service_external_url | length > 0

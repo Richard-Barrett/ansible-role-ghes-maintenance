@@ -1,0 +1,33 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  vars:
+    molecule_test_root: "/tmp/ansible-role-ghes-maintenance-default"
+  tasks:
+    - name: Read the resulting mocked GHES version
+      ansible.builtin.slurp:
+        src: "{{ molecule_test_root }}/version"
+      register: molecule_version
+
+    - name: Read maintenance mode transitions
+      ansible.builtin.slurp:
+        src: "{{ molecule_test_root }}/maintenance.log"
+      register: molecule_maintenance
+
+    - name: Inspect generated evidence
+      ansible.builtin.stat:
+        path: "{{ molecule_test_root }}/artifacts/ghes-mock-{{ item }}check.txt"
+      loop:
+        - pre
+        - post
+      register: molecule_evidence
+
+    - name: Verify the mocked upgrade workflow
+      ansible.builtin.assert:
+        that:
+          - (molecule_version.content | b64decode | trim) == '3.21.1'
+          - "'-s GitHub Enterprise Server is being upgraded.' in (molecule_maintenance.content | b64decode)"
+          - "'-u' in (molecule_maintenance.content | b64decode)"
+          - molecule_evidence.results | map(attribute='stat.exists') | list == [true, true]
+        fail_msg: "The mocked GHES upgrade did not complete all expected steps."

@@ -5,6 +5,10 @@ Ansible Role for GHES Maintenance
 
 A guarded Ansible role for upgrading a standalone GitHub Enterprise Server appliance or the primary node of an HA pair with `ghe-upgrade`.
 
+For installation, preflight planning, a complete variable reference, HA
+guidance, and operational examples, see the
+[usage guide](docs/README.md).
+
 ## Safety model
 
 The role will not run unless all of these are explicitly provided:
@@ -94,3 +98,18 @@ This role checks replication when `ghes_upgrade_topology: ha_primary`, but it do
 ## Package and upgrade-path validation
 
 The role validates the local state but does not infer a supported upgrade path. Before execution, use GitHub's Upgrade Assistant and obtain the correct platform-specific `.pkg` or universal `.hpkg` package. A hotpatch is only suitable for patch releases in the same feature series; a feature release requires an upgrade package.
+
+## Testing
+
+The Molecule suite runs against local mocked GHES commands, so it does not need
+a licensed appliance, VM, or container:
+
+```bash
+make setup
+make molecule
+```
+
+The `default` scenario exercises a complete successful upgrade. The
+`guardrails` scenario checks that missing operator confirmation and unsupported
+cluster topology are rejected. See
+[`molecule/README.md`](molecule/README.md) for individual scenario commands.

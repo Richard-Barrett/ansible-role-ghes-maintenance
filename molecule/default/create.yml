@@ -1,0 +1,8 @@
+---
+- name: Create test instance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Record that the delegated instance is ready
+      ansible.builtin.debug:
+        msg: "Using the local Molecule instance; no VM or container is created."

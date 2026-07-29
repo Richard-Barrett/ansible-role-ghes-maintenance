@@ -1,0 +1,68 @@
+---
+- name: Exercise role guardrails
+  hosts: all
+  gather_facts: false
+  vars:
+    molecule_test_root: "/tmp/ansible-role-ghes-maintenance-guardrails"
+  tasks:
+    - name: Refuse an upgrade without explicit confirmation
+      block:
+        - name: Invoke role without confirmation
+          ansible.builtin.include_role:
+            name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+          vars:
+            ghes_upgrade_confirm: false
+            ghes_upgrade_target_version: "3.21.1"
+            ghes_upgrade_package_remote_path: "{{ molecule_test_root }}/upgrade.pkg"
+
+        - name: Fail when missing confirmation was accepted
+          ansible.builtin.fail:
+            msg: "The role accepted an upgrade without explicit confirmation."
+      rescue:
+        - name: Verify missing confirmation was rejected
+          ansible.builtin.assert:
+            that:
+              - "'Refusing to upgrade' in ansible_failed_result.msg"
+
+        - name: Record confirmation guardrail success
+          ansible.builtin.set_fact:
+            molecule_confirmation_guardrail_passed: true
+
+    - name: Refuse an unsupported cluster topology
+      block:
+        - name: Invoke role with cluster topology
+          ansible.builtin.include_role:
+            name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+          vars:
+            ghes_upgrade_confirm: true
+            ghes_upgrade_target_version: "3.21.1"
+            ghes_upgrade_topology: "cluster"
+            ghes_upgrade_package_remote_path: "{{ molecule_test_root }}/upgrade.pkg"
+
+        - name: Fail when cluster topology was accepted
+          ansible.builtin.fail:
+            msg: "The role accepted unsupported cluster topology."
+      rescue:
+        - name: Verify cluster topology was rejected
+          ansible.builtin.assert:
+            that:
+              - "'supports standalone appliances and HA primary nodes only' in ansible_failed_result.msg"
+
+        - name: Record topology guardrail success
+          ansible.builtin.set_fact:
+            molecule_topology_guardrail_passed: true
+
+    - name: Create guardrail result directory
+      ansible.builtin.file:
+        path: "{{ molecule_test_root }}"
+        state: directory
+        mode: "0755"
+
+    - name: Persist guardrail results for verification
+      ansible.builtin.copy:
+        dest: "{{ molecule_test_root }}/results.yml"
+        mode: "0644"
+        content: |
+          ---
+          confirmation: {{ molecule_confirmation_guardrail_passed | default(false) | bool | lower }}
+          topology: {{ molecule_topology_guardrail_passed | default(false) | bool | lower }}

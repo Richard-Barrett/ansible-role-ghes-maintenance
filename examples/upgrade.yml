@@ -6,7 +6,8 @@
   any_errors_fatal: true
 
   roles:
-    - role: ghes_upgrade
+    # Use the checkout directly so this example also passes local syntax checks.
+    - role: "{{ playbook_dir }}/.."  # noqa role-name[path]
       vars:
         ghes_upgrade_confirm: true
         ghes_upgrade_expected_current_version: "3.20.4"

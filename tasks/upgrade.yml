@@ -34,7 +34,14 @@
     - name: Run ghe-upgrade and accept installation prompt
       ansible.builtin.shell: |
         set -o pipefail
-        printf 'y\n' | {{ ghes_upgrade_command | quote }} {{ ghes_upgrade_package_remote_path | quote }}{% for arg in ghes_upgrade_command_extra_args %} {{ arg | quote }}{% endfor %}
+        upgrade_command=(
+          {{ ghes_upgrade_command | quote }}
+          {{ ghes_upgrade_package_remote_path | quote }}
+          {% for arg in ghes_upgrade_command_extra_args %}
+          {{ arg | quote }}
+          {% endfor %}
+        )
+        printf 'y\n' | "${upgrade_command[@]}"
       args:
         executable: /bin/bash
       register: ghes_upgrade_execution

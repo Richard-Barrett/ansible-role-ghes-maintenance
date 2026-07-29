@@ -1,0 +1,24 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: false
+  environment:
+    MOCK_GHES_ROOT: "{{ molecule_test_root }}"
+    MOCK_GHES_TARGET_VERSION: "{{ ghes_upgrade_target_version }}"
+    PATH: "{{ molecule_mock_bin }}:{{ lookup('ansible.builtin.env', 'PATH') }}"
+  vars:
+    molecule_test_root: "/tmp/ansible-role-ghes-maintenance-default"
+    molecule_mock_bin: "{{ molecule_test_root }}/bin"
+    ghes_upgrade_confirm: true
+    ghes_upgrade_expected_current_version: "3.20.4"
+    ghes_upgrade_target_version: "3.21.1"
+    ghes_upgrade_package_remote_path: "{{ molecule_test_root }}/github-enterprise-3.21.1.pkg"
+    ghes_upgrade_backup_confirmed: true
+    ghes_upgrade_snapshot_confirmed: true
+    ghes_upgrade_connection_delay: 0
+    ghes_upgrade_reboot_timeout: 60
+    ghes_upgrade_background_jobs_timeout: 10
+    ghes_upgrade_background_jobs_poll: 1
+    ghes_upgrade_artifact_dir: "{{ molecule_test_root }}/artifacts"
+  roles:
+    - role: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"

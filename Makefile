@@ -17,6 +17,7 @@ UPGRADE_PLAYBOOK ?= examples/upgrade.yml
 SERVICE_PLAYBOOK ?= examples/services.yml
 SCENARIO ?= default
 SERVICE_URL ?=
+SERVICE_RESTART_COMMAND ?=
 DIST_DIR ?= dist
 ARCHIVE_NAME ?= ansible-role-ghes-maintenance.tar.gz
 
@@ -35,6 +36,7 @@ help: ## Show this help output
 	@printf '  %-28s %s\n' 'LIMIT=<host-or-group>' 'Inventory host/group limit'
 	@printf '  %-28s %s\n' 'SCENARIO=<name>' 'Molecule scenario (default: default)'
 	@printf '  %-28s %s\n' 'SERVICE_URL=<url>' 'Optional post-restart health-check URL'
+	@printf '  %-28s %s\n' 'SERVICE_RESTART_COMMAND=<cmd>' 'GitHub Support-approved service restart command'
 	@printf '  %-28s %s\n' 'VENV=<path>' 'Python virtual environment directory'
 	@printf '\nExamples:\n'
 	@printf '  make setup\n'
@@ -77,7 +79,7 @@ syntax: deps ## Run Ansible syntax checks for example playbooks
 	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $(SERVICE_PLAYBOOK) --syntax-check
 
 pre-commit: deps ## Run every configured pre-commit hook against all files
-	$(PRE_COMMIT) run --all-files --show-diff-on-failure
+	PATH="$(abspath $(VENV_BIN)):$$PATH" $(PRE_COMMIT) run --all-files --show-diff-on-failure
 
 test: lint syntax molecule ## Run static analysis, syntax checks, and all Molecule scenarios
 
@@ -121,10 +123,15 @@ service-status: deps ## Display GHES core-service status for the selected instan
 		-e service_action=status
 
 restart-core-services: deps ## Guardedly reload/restart GHES core services and run sanity checks
+	@test -n "$(SERVICE_RESTART_COMMAND)" || { \
+		printf '%s\n' 'Set SERVICE_RESTART_COMMAND to a GitHub Support-approved command.'; \
+		exit 2; \
+	}
 	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $(SERVICE_PLAYBOOK) \
 		--limit '$(LIMIT)' \
 		-e service_action=restart_core \
 		-e service_restart_confirm=true \
+		-e service_restart_command='$(SERVICE_RESTART_COMMAND)' \
 		$(if $(SERVICE_URL),-e service_external_url='$(SERVICE_URL)',)
 
 package: clean-dist ## Create a distributable repository archive under DIST_DIR
@@ -133,6 +140,7 @@ package: clean-dist ## Create a distributable repository archive under DIST_DIR
 		--exclude='./$(VENV)' \
 		--exclude='./$(DIST_DIR)' \
 		--exclude='./.git' \
+		--exclude='./.ansible' \
 		--exclude='./.molecule' \
 		--exclude='./__pycache__' \
 		-czf $(DIST_DIR)/$(ARCHIVE_NAME) .

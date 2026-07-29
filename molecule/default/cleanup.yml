@@ -1,0 +1,9 @@
+---
+- name: Clean up mocked GHES state
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Remove the scenario test directory
+      ansible.builtin.file:
+        path: "/tmp/ansible-role-ghes-maintenance-default"
+        state: absent

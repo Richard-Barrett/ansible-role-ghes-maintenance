@@ -42,6 +42,7 @@ dist/
 # Ansible runtime artifacts
 *.retry
 ansible.log
+.ansible/
 .fact_cache/
 collections/
 roles/
