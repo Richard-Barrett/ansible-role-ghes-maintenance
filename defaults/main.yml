@@ -1,0 +1,69 @@
+---
+# Upgrade package. Set exactly one source mode:
+# - controller file: ghes_upgrade_package_local_path
+# - already on appliance: ghes_upgrade_package_remote_path
+
+ghes_upgrade_package_local_path: ""
+ghes_upgrade_package_remote_path: "/home/admin/ghes-upgrade.pkg"
+ghes_upgrade_package_mode: "0644"
+ghes_upgrade_remove_package_after: false
+
+# Mandatory guardrail. The play must explicitly opt in.
+ghes_upgrade_confirm: false
+ghes_upgrade_expected_current_version: ""
+ghes_upgrade_target_version: ""
+
+# Topology: standalone or ha_primary. Cluster upgrades are intentionally rejected.
+ghes_upgrade_topology: "standalone"
+ghes_upgrade_validate_replication: true
+
+# Maintenance mode handling.
+ghes_upgrade_manage_maintenance: true
+ghes_upgrade_maintenance_message: "GitHub Enterprise Server is being upgraded."
+ghes_upgrade_leave_maintenance_on_failure: true
+
+# Pre-upgrade requirements controlled outside the appliance.
+ghes_upgrade_require_backup_confirmation: true
+ghes_upgrade_backup_confirmed: false
+ghes_upgrade_require_snapshot_confirmation: true
+ghes_upgrade_snapshot_confirmed: false
+
+# Capacity and disk guardrails.
+ghes_upgrade_min_root_free_mb: 10240
+ghes_upgrade_min_data_free_mb: 20480
+ghes_upgrade_max_root_used_percent: 85
+ghes_upgrade_max_data_used_percent: 90
+
+# Upgrade behavior.
+ghes_upgrade_command: "ghe-upgrade"
+ghes_upgrade_command_extra_args: []
+ghes_upgrade_reboot_timeout: 3600
+ghes_upgrade_connection_delay: 30
+ghes_upgrade_background_jobs_timeout: 14400
+ghes_upgrade_background_jobs_poll: 60
+ghes_upgrade_wait_for_background_jobs: true
+
+# HTTP sanity checks run from the Ansible controller.
+ghes_upgrade_external_url: ""
+ghes_upgrade_validate_certs: true
+ghes_upgrade_http_status_codes:
+  - 200
+  - 301
+  - 302
+  - 401
+  - 403
+ghes_upgrade_http_retries: 60
+ghes_upgrade_http_delay: 15
+
+# Optional commands for environment-specific validation.
+# Each item may be a string or { name: ..., command: ... }.
+ghes_upgrade_precheck_commands: []
+ghes_upgrade_postcheck_commands: []
+
+# Optional API health endpoint checks from the controller.
+ghes_upgrade_api_checks:
+  - path: "/api/v3/meta"
+    status_codes: [200, 401, 403]
+
+# Command output location on the controller.
+ghes_upgrade_artifact_dir: "{{ playbook_dir }}/artifacts/ghes-upgrade"

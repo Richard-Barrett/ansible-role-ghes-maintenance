@@ -1,0 +1,150 @@
+---
+- name: Verify required GHES utilities exist
+  ansible.builtin.shell: |
+    set -o pipefail
+    for command in ghe-version ghe-config-check ghe-maintenance {{ ghes_upgrade_command }}; do
+      command -v "$command" >/dev/null 2>&1 || { echo "Missing $command" >&2; exit 1; }
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Read current GHES version
+  ansible.builtin.command: ghe-version
+  register: ghes_upgrade_version_before_raw
+  changed_when: false
+
+- name: Extract current GHES version
+  ansible.builtin.set_fact:
+    ghes_upgrade_version_before: >-
+      {{ (ghes_upgrade_version_before_raw.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+')) | default('', true) }}
+
+- name: Validate current GHES version
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_version_before | length > 0
+      - ghes_upgrade_expected_current_version | length == 0 or ghes_upgrade_version_before == ghes_upgrade_expected_current_version
+      - ghes_upgrade_version_before != ghes_upgrade_target_version
+    fail_msg: >-
+      Current version is {{ ghes_upgrade_version_before | default('unknown') }}.
+      Expected {{ ghes_upgrade_expected_current_version | default('not specified') }},
+      target {{ ghes_upgrade_target_version }}.
+
+- name: Check GHES configuration
+  ansible.builtin.command: ghe-config-check --error-checks-only
+  register: ghes_upgrade_config_check
+  changed_when: false
+
+- name: Check background upgrade jobs before feature upgrade
+  ansible.builtin.command: ghe-check-background-upgrade-jobs
+  register: ghes_upgrade_background_before
+  changed_when: false
+  failed_when: false
+
+- name: Require prior background upgrade jobs to be complete
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_background_before.rc == 0
+    fail_msg: >-
+      Existing background upgrade jobs are not complete. Resolve them before
+      starting another feature upgrade. Output: {{ ghes_upgrade_background_before.stdout }}
+      {{ ghes_upgrade_background_before.stderr }}
+
+- name: Collect filesystem usage
+  ansible.builtin.command: df -Pm / /data/user
+  register: ghes_upgrade_df
+  changed_when: false
+
+- name: Collect root filesystem statistics
+  ansible.builtin.shell: "df -Pm / | awk 'NR==2 {gsub(/%/,\"\",$5); print $4, $5}'"
+  args:
+    executable: /bin/bash
+  register: ghes_upgrade_root_df
+  changed_when: false
+
+- name: Collect data filesystem statistics
+  ansible.builtin.shell: "df -Pm /data/user | awk 'NR==2 {gsub(/%/,\"\",$5); print $4, $5}'"
+  args:
+    executable: /bin/bash
+  register: ghes_upgrade_data_df
+  changed_when: false
+
+- name: Enforce filesystem capacity thresholds
+  ansible.builtin.assert:
+    that:
+      - (ghes_upgrade_root_df.stdout.split()[0] | int) >= (ghes_upgrade_min_root_free_mb | int)
+      - (ghes_upgrade_root_df.stdout.split()[1] | int) <= (ghes_upgrade_max_root_used_percent | int)
+      - (ghes_upgrade_data_df.stdout.split()[0] | int) >= (ghes_upgrade_min_data_free_mb | int)
+      - (ghes_upgrade_data_df.stdout.split()[1] | int) <= (ghes_upgrade_max_data_used_percent | int)
+    fail_msg: "Filesystem capacity thresholds failed: {{ ghes_upgrade_df.stdout }}"
+
+- name: Check for large or deleted-open files
+  ansible.builtin.command: ghe-check-disk-usage
+  register: ghes_upgrade_disk_check
+  changed_when: false
+  failed_when: false
+
+- name: Validate HA replication status
+  ansible.builtin.command: ghe-repl-status -vv
+  register: ghes_upgrade_replication_before
+  changed_when: false
+  when:
+    - ghes_upgrade_topology == 'ha_primary'
+    - ghes_upgrade_validate_replication | bool
+
+- name: Require healthy HA replication
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_replication_before.rc == 0
+      - "'error' not in (ghes_upgrade_replication_before.stdout | lower)"
+      - "'failed' not in (ghes_upgrade_replication_before.stdout | lower)"
+    fail_msg: "HA replication is not healthy: {{ ghes_upgrade_replication_before.stdout }}"
+  when:
+    - ghes_upgrade_topology == 'ha_primary'
+    - ghes_upgrade_validate_replication | bool
+
+- name: Run custom pre-upgrade checks
+  ansible.builtin.shell: >-
+    {{ (item.command if item is mapping else item) }}
+  args:
+    executable: /bin/bash
+  loop: "{{ ghes_upgrade_precheck_commands }}"
+  loop_control:
+    label: "{{ item.name | default(item) if item is mapping else item }}"
+  changed_when: false
+
+- name: Ensure controller artifact directory exists
+  ansible.builtin.file:
+    path: "{{ ghes_upgrade_artifact_dir }}"
+    state: directory
+    mode: "0750"
+  delegate_to: localhost
+  become: false
+
+- name: Save pre-upgrade evidence
+  ansible.builtin.copy:
+    dest: "{{ ghes_upgrade_artifact_dir }}/{{ inventory_hostname }}-precheck.txt"
+    mode: "0640"
+    content: |
+      Host: {{ inventory_hostname }}
+      Version: {{ ghes_upgrade_version_before }}
+      Target: {{ ghes_upgrade_target_version }}
+      Filesystems:
+      {{ ghes_upgrade_df.stdout }}
+
+      Configuration check:
+      {{ ghes_upgrade_config_check.stdout }}
+      {{ ghes_upgrade_config_check.stderr }}
+
+      Background jobs:
+      {{ ghes_upgrade_background_before.stdout }}
+      {{ ghes_upgrade_background_before.stderr }}
+
+      Disk check:
+      {{ ghes_upgrade_disk_check.stdout }}
+      {{ ghes_upgrade_disk_check.stderr }}
+
+      Replication:
+      {{ ghes_upgrade_replication_before.stdout | default('not applicable') }}
+  delegate_to: localhost
+  become: false

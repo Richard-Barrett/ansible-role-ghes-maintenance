@@ -1,0 +1,7 @@
+---
+all:
+  hosts:
+    ghes-primary:
+      ansible_host: github.example.com
+      ansible_user: admin
+      ansible_port: 122

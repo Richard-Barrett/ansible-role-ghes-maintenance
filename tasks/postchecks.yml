@@ -1,0 +1,122 @@
+---
+- name: Wait for background upgrade jobs to complete
+  ansible.builtin.command: ghe-check-background-upgrade-jobs
+  register: ghes_upgrade_background_after
+  changed_when: false
+  until: ghes_upgrade_background_after.rc == 0
+  retries: "{{ (ghes_upgrade_background_jobs_timeout | int / ghes_upgrade_background_jobs_poll | int) | round(0, 'ceil') | int }}"
+  delay: "{{ ghes_upgrade_background_jobs_poll }}"
+  when: ghes_upgrade_wait_for_background_jobs | bool
+
+- name: Read upgraded GHES version
+  ansible.builtin.command: ghe-version
+  register: ghes_upgrade_version_after_raw
+  changed_when: false
+
+- name: Extract upgraded GHES version
+  ansible.builtin.set_fact:
+    ghes_upgrade_version_after: >-
+      {{ (ghes_upgrade_version_after_raw.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+')) | default('', true) }}
+
+- name: Verify target version is installed
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_version_after == ghes_upgrade_target_version
+    fail_msg: >-
+      Expected GHES {{ ghes_upgrade_target_version }}, but ghe-version returned
+      {{ ghes_upgrade_version_after_raw.stdout }}.
+
+- name: Recheck GHES configuration
+  ansible.builtin.command: ghe-config-check --error-checks-only
+  register: ghes_upgrade_config_after
+  changed_when: false
+
+- name: Validate HA replication after upgrade
+  ansible.builtin.command: ghe-repl-status -vv
+  register: ghes_upgrade_replication_after
+  changed_when: false
+  when:
+    - ghes_upgrade_topology == 'ha_primary'
+    - ghes_upgrade_validate_replication | bool
+
+- name: Require healthy HA replication after upgrade
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_replication_after.rc == 0
+      - "'error' not in (ghes_upgrade_replication_after.stdout | lower)"
+      - "'failed' not in (ghes_upgrade_replication_after.stdout | lower)"
+    fail_msg: "HA replication is not healthy after upgrade."
+  when:
+    - ghes_upgrade_topology == 'ha_primary'
+    - ghes_upgrade_validate_replication | bool
+
+- name: Run custom post-upgrade checks
+  ansible.builtin.shell: >-
+    {{ (item.command if item is mapping else item) }}
+  args:
+    executable: /bin/bash
+  loop: "{{ ghes_upgrade_postcheck_commands }}"
+  loop_control:
+    label: "{{ item.name | default(item) if item is mapping else item }}"
+  changed_when: false
+
+- name: Check main GHES URL while still in maintenance mode
+  ansible.builtin.uri:
+    url: "{{ ghes_upgrade_external_url }}"
+    method: GET
+    validate_certs: "{{ ghes_upgrade_validate_certs }}"
+    status_code: "{{ ghes_upgrade_http_status_codes }}"
+    return_content: false
+  register: ghes_upgrade_main_http
+  until: ghes_upgrade_main_http.status in ghes_upgrade_http_status_codes
+  retries: "{{ ghes_upgrade_http_retries }}"
+  delay: "{{ ghes_upgrade_http_delay }}"
+  delegate_to: localhost
+  become: false
+  when: ghes_upgrade_external_url | length > 0
+
+- name: Disable maintenance mode
+  ansible.builtin.command: ghe-maintenance -u
+  when: ghes_upgrade_manage_maintenance | bool
+  changed_when: true
+
+- name: Run GHES API sanity checks
+  ansible.builtin.uri:
+    url: "{{ ghes_upgrade_external_url }}{{ item.path }}"
+    method: GET
+    validate_certs: "{{ ghes_upgrade_validate_certs }}"
+    status_code: "{{ item.status_codes | default([200, 401, 403]) }}"
+    return_content: false
+  loop: "{{ ghes_upgrade_api_checks }}"
+  register: ghes_upgrade_api_results
+  retries: "{{ ghes_upgrade_http_retries }}"
+  delay: "{{ ghes_upgrade_http_delay }}"
+  until: ghes_upgrade_api_results.status in (item.status_codes | default([200, 401, 403]))
+  delegate_to: localhost
+  become: false
+  when: ghes_upgrade_external_url | length > 0
+
+- name: Save post-upgrade evidence
+  ansible.builtin.copy:
+    dest: "{{ ghes_upgrade_artifact_dir }}/{{ inventory_hostname }}-postcheck.txt"
+    mode: "0640"
+    content: |
+      Host: {{ inventory_hostname }}
+      Previous version: {{ ghes_upgrade_version_before }}
+      Installed version: {{ ghes_upgrade_version_after }}
+
+      Configuration check:
+      {{ ghes_upgrade_config_after.stdout }}
+      {{ ghes_upgrade_config_after.stderr }}
+
+      Background jobs:
+      {{ ghes_upgrade_background_after.stdout | default('not checked') }}
+      {{ ghes_upgrade_background_after.stderr | default('') }}
+
+      Replication:
+      {{ ghes_upgrade_replication_after.stdout | default('not applicable') }}
+
+      Main HTTP status:
+      {{ ghes_upgrade_main_http.status | default('not checked') }}
+  delegate_to: localhost
+  become: false

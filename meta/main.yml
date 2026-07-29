@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  role_name: ghes_upgrade
+  author: Richard Barrett
+  description: Guarded GitHub Enterprise Server upgrades using ghe-upgrade.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+dependencies: []

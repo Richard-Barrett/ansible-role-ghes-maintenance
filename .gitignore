@@ -1,0 +1,83 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Python environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Ansible runtime artifacts
+*.retry
+ansible.log
+.fact_cache/
+collections/
+roles/
+
+# Ansible Vault temporary files
+*.vault.tmp
+
+# Molecule runtime and cache
+.molecule/
+.molecule_cache/
+.molecule-ephemeral/
+
+# Test and lint output
+junit.xml
+reports/
+artifacts/
+.cache/
+
+# Local inventory and secrets
+inventory/local*
+inventory/*-local*
+*.secret.yml
+*.secrets.yml
+*.vault.yml
+.env
+.env.*
+!.env.example
+
+# Upgrade packages and appliance artifacts
+*.pkg
+*.hpkg
+*.sha256
+*.sha512
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig

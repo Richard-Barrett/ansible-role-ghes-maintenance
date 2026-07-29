@@ -1,0 +1,40 @@
+---
+- name: Require explicit upgrade confirmation
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_confirm | bool
+    fail_msg: >-
+      Refusing to upgrade. Set ghes_upgrade_confirm=true only during an approved
+      maintenance window.
+
+- name: Validate supported topology
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_topology in ['standalone', 'ha_primary']
+    fail_msg: >-
+      This role supports standalone appliances and HA primary nodes only.
+      GHES clusters require the cluster-specific upgrade procedure.
+
+- name: Require target version
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_target_version | length > 0
+    fail_msg: "Set ghes_upgrade_target_version, for example 3.21.1."
+
+- name: Require backup confirmation
+  ansible.builtin.assert:
+    that:
+      - not (ghes_upgrade_require_backup_confirmation | bool) or (ghes_upgrade_backup_confirmed | bool)
+    fail_msg: "A recent successful GHES backup must be confirmed before upgrade."
+
+- name: Require snapshot confirmation
+  ansible.builtin.assert:
+    that:
+      - not (ghes_upgrade_require_snapshot_confirmation | bool) or (ghes_upgrade_snapshot_confirmed | bool)
+    fail_msg: "A current VM snapshot must be confirmed before upgrade."
+
+- name: Validate package source
+  ansible.builtin.assert:
+    that:
+      - (ghes_upgrade_package_local_path | length > 0) or (ghes_upgrade_package_remote_path | length > 0)
+    fail_msg: "Set a local package path or an existing remote package path."

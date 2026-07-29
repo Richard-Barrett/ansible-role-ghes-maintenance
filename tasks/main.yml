@@ -1,0 +1,12 @@
+---
+- name: Validate role inputs
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Run GHES pre-upgrade checks
+  ansible.builtin.import_tasks: prechecks.yml
+
+- name: Install GHES upgrade
+  ansible.builtin.import_tasks: upgrade.yml
+
+- name: Run GHES post-upgrade checks
+  ansible.builtin.import_tasks: postchecks.yml

@@ -1,0 +1,29 @@
+---
+- name: Upgrade GitHub Enterprise Server
+  hosts: ghes-primary
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+
+  roles:
+    - role: ghes_upgrade
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_expected_current_version: "3.20.4"
+        ghes_upgrade_target_version: "3.21.1"
+
+        ghes_upgrade_package_local_path: "/secure/packages/github-enterprise-3.21.1.pkg"
+        ghes_upgrade_package_remote_path: "/home/admin/github-enterprise-3.21.1.pkg"
+
+        ghes_upgrade_topology: "standalone"
+        ghes_upgrade_backup_confirmed: true
+        ghes_upgrade_snapshot_confirmed: true
+        ghes_upgrade_external_url: "https://github.example.com"
+
+        ghes_upgrade_precheck_commands:
+          - name: Check local service state
+            command: "ghe-service-list | grep -v '^$'"
+
+        ghes_upgrade_postcheck_commands:
+          - name: Validate SSH banner
+            command: "ghe-version"

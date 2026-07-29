@@ -1,0 +1,68 @@
+---
+- name: Copy upgrade package to appliance
+  ansible.builtin.copy:
+    src: "{{ ghes_upgrade_package_local_path }}"
+    dest: "{{ ghes_upgrade_package_remote_path }}"
+    mode: "{{ ghes_upgrade_package_mode }}"
+  when: ghes_upgrade_package_local_path | length > 0
+
+- name: Verify upgrade package exists
+  ansible.builtin.stat:
+    path: "{{ ghes_upgrade_package_remote_path }}"
+    checksum_algorithm: sha256
+  register: ghes_upgrade_package_stat
+
+- name: Require valid upgrade package
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_package_stat.stat.exists
+      - ghes_upgrade_package_stat.stat.isreg
+      - ghes_upgrade_package_stat.stat.size | int > 0
+    fail_msg: "Upgrade package is missing or empty: {{ ghes_upgrade_package_remote_path }}"
+
+- name: Enable maintenance mode
+  ansible.builtin.command:
+    argv:
+      - ghe-maintenance
+      - -s
+      - "{{ ghes_upgrade_maintenance_message }}"
+  when: ghes_upgrade_manage_maintenance | bool
+  changed_when: true
+
+- name: Execute GHES upgrade package
+  block:
+    - name: Run ghe-upgrade and accept installation prompt
+      ansible.builtin.shell: |
+        set -o pipefail
+        printf 'y\n' | {{ ghes_upgrade_command | quote }} {{ ghes_upgrade_package_remote_path | quote }}{% for arg in ghes_upgrade_command_extra_args %} {{ arg | quote }}{% endfor %}
+      args:
+        executable: /bin/bash
+      register: ghes_upgrade_execution
+      async: "{{ ghes_upgrade_reboot_timeout }}"
+      poll: 0
+      changed_when: true
+
+    - name: Allow upgrade command to begin before reconnect polling
+      ansible.builtin.pause:
+        seconds: "{{ ghes_upgrade_connection_delay }}"
+      delegate_to: localhost
+
+    - name: Wait for appliance SSH to return
+      ansible.builtin.wait_for_connection:
+        delay: "{{ ghes_upgrade_connection_delay }}"
+        timeout: "{{ ghes_upgrade_reboot_timeout }}"
+        sleep: 15
+
+  rescue:
+    - name: Report failed upgrade while preserving maintenance mode
+      ansible.builtin.fail:
+        msg: >-
+          GHES upgrade failed or the appliance did not return. Maintenance mode
+          remains enabled={{ ghes_upgrade_leave_maintenance_on_failure }}.
+          Review the appliance console and upgrade logs before retrying.
+
+- name: Remove staged package
+  ansible.builtin.file:
+    path: "{{ ghes_upgrade_package_remote_path }}"
+    state: absent
+  when: ghes_upgrade_remove_package_after | bool
