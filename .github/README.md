@@ -3,6 +3,12 @@
 # Ansible Role: `ansible-role-ghes-maintenance`
 Ansible Role for GHES Maintenance
 
+[![Ansible lint](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/lint.yml/badge.svg)](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/lint.yml)
+[![Build role archive](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/build.yml/badge.svg)](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/build.yml)
+[![Molecule](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/molecule.yml/badge.svg)](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/molecule.yml)
+[![Pre-commit](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/pre-commit.yml)
+[![Publish role to Ansible Galaxy](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/publish.yml/badge.svg)](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/actions/workflows/publish.yml)
+
 A guarded Ansible role for upgrading a standalone GitHub Enterprise Server appliance or the primary node of an HA pair with `ghe-upgrade`.
 
 For installation, preflight planning, a complete variable reference, HA
