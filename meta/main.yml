@@ -1,6 +1,5 @@
 ---
 galaxy_info:
-  namespace: richard_barrett
   role_name: ghes_upgrade
   author: Richard Barrett
   description: Guarded GitHub Enterprise Server upgrades using ghe-upgrade.

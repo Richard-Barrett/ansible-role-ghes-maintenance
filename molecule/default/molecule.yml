@@ -1,4 +1,6 @@
 ---
+role_name_check: 2
+
 dependency:
   name: galaxy
   enabled: false

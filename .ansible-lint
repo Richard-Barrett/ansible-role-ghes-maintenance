@@ -1,0 +1,6 @@
+---
+# Galaxy legacy roles use the authenticated GitHub namespace. The repository
+# owner is Richard-Barrett, which is valid for legacy role imports but does not
+# meet collection-style namespace naming rules.
+skip_list:
+  - role-name
