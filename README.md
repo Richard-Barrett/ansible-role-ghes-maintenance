@@ -7,7 +7,7 @@ A guarded Ansible role for upgrading a standalone GitHub Enterprise Server appli
 
 For installation, preflight planning, a complete variable reference, HA
 guidance, and operational examples, see the
-[usage guide](docs/README.md).
+[usage guide](https://github.com/Richard-Barrett/ansible-role-ghes-maintenance/wiki).
 
 ## Safety model
 
