@@ -1,0 +1,82 @@
+---
+- name: Preflight every GHES HA appliance
+  hosts: ghes_primary:ghes_replicas
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Validate the node before the maintenance window
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/.."  # noqa role-name[path]
+        tasks_from: ha_preflight
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: >-
+          {{ 'ha_primary' if inventory_hostname in groups['ghes_primary'] else 'ha_replica' }}
+        ghes_upgrade_ha_orchestrated: true
+        ghes_upgrade_manage_maintenance: false
+        ghes_upgrade_validate_replication: false
+
+- name: Prepare the GHES HA configuration
+  hosts: ghes_primary
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require exactly one primary and at least one replica
+      ansible.builtin.assert:
+        that:
+          - groups['ghes_primary'] | length == 1
+          - groups['ghes_replicas'] | length > 0
+        fail_msg: >-
+          Define exactly one host in ghes_primary and at least one host in
+          ghes_replicas before running the HA upgrade.
+
+    - name: Enter maintenance mode and stop replication
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/.."  # noqa role-name[path]
+        tasks_from: ha_prepare
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: "ha_primary"
+        ghes_upgrade_ha_orchestrated: true
+
+- name: Upgrade the GHES HA primary
+  hosts: ghes_primary
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  roles:
+    - role: "{{ playbook_dir }}/.."  # noqa role-name[path]
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: "ha_primary"
+        ghes_upgrade_ha_orchestrated: true
+        ghes_upgrade_manage_maintenance: false
+        ghes_upgrade_validate_replication: false
+
+- name: Upgrade GHES HA replicas one at a time
+  hosts: ghes_replicas
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  roles:
+    - role: "{{ playbook_dir }}/.."  # noqa role-name[path]
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: "ha_replica"
+        ghes_upgrade_ha_orchestrated: true
+        ghes_upgrade_manage_maintenance: false
+        ghes_upgrade_validate_replication: false
+
+- name: Restore and verify the GHES HA configuration
+  hosts: ghes_primary
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Restart replication and leave maintenance mode
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/.."  # noqa role-name[path]
+        tasks_from: ha_finalize
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: "ha_primary"
+        ghes_upgrade_ha_orchestrated: true

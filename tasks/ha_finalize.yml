@@ -1,0 +1,37 @@
+---
+- name: Validate HA finalization inputs
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_confirm | bool
+      - ghes_upgrade_topology == 'ha_primary'
+      - ghes_upgrade_ha_orchestrated | bool
+    fail_msg: >-
+      HA finalization must run on the primary with explicit confirmation,
+      ghes_upgrade_topology=ha_primary, and ghes_upgrade_ha_orchestrated=true.
+
+- name: Verify HA finalization utilities exist
+  ansible.builtin.shell: |
+    set -o pipefail
+    for command in ghe-maintenance ghe-repl-status ghe-repl-start-all; do
+      command -v "$command" >/dev/null 2>&1 || { echo "Missing $command" >&2; exit 1; }
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Start replication on all HA replicas
+  ansible.builtin.command: ghe-repl-start-all
+  changed_when: true
+
+- name: Wait for healthy HA replication
+  ansible.builtin.command: ghe-repl-status -vv
+  register: ghes_upgrade_ha_replication_after
+  changed_when: false
+  failed_when: false
+  until: ghes_upgrade_ha_replication_after.rc == 0
+  retries: "{{ ghes_upgrade_replication_retries }}"
+  delay: "{{ ghes_upgrade_replication_delay }}"
+
+- name: Disable maintenance mode after HA recovery
+  ansible.builtin.command: ghe-maintenance -u
+  changed_when: true

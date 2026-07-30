@@ -1,0 +1,30 @@
+---
+- name: Validate HA node inputs
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Run HA node pre-upgrade checks
+  ansible.builtin.import_tasks: prechecks.yml
+
+- name: Stage the HA node upgrade package
+  ansible.builtin.copy:
+    src: "{{ ghes_upgrade_package_local_path }}"
+    dest: "{{ ghes_upgrade_package_remote_path }}"
+    mode: "{{ ghes_upgrade_package_mode }}"
+  when: ghes_upgrade_package_local_path | length > 0
+
+- name: Verify the HA node upgrade package exists
+  ansible.builtin.stat:
+    path: "{{ ghes_upgrade_package_remote_path }}"
+    checksum_algorithm: sha256
+  register: ghes_upgrade_ha_package_stat
+
+- name: Require a valid package on the HA node
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_ha_package_stat.stat.exists
+      - ghes_upgrade_ha_package_stat.stat.isreg
+      - ghes_upgrade_ha_package_stat.stat.size | int > 0
+    fail_msg: >-
+      Stage a non-empty upgrade package on every HA node before stopping
+      replication. Missing from {{ inventory_hostname }}:
+      {{ ghes_upgrade_package_remote_path }}

@@ -13,4 +13,5 @@
         that:
           - molecule_guardrails.confirmation | bool
           - molecule_guardrails.topology | bool
+          - molecule_guardrails.replica | bool
         fail_msg: "One or more required GHES upgrade guardrails did not reject unsafe input."

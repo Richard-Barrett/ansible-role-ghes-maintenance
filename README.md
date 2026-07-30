@@ -3,7 +3,8 @@
 # Ansible Role: `ansible-role-ghes-maintenance`
 Ansible Role for GHES Maintenance
 
-A guarded Ansible role for upgrading a standalone GitHub Enterprise Server appliance or the primary node of an HA pair with `ghe-upgrade`.
+A guarded Ansible role for upgrading a standalone GitHub Enterprise Server
+appliance or orchestrating an HA primary and its replicas with `ghe-upgrade`.
 
 For installation, preflight planning, a complete variable reference, HA
 guidance, and operational examples, see the
@@ -29,7 +30,7 @@ The role intentionally rejects GHES cluster topology. Cluster upgrades have a di
 4. Verify no earlier background upgrade jobs remain.
 5. Enforce root and `/data/user` capacity thresholds.
 6. Run `ghe-check-disk-usage` and optional custom checks.
-7. For HA primary nodes, validate `ghe-repl-status -vv`.
+7. For a non-orchestrated HA primary, validate `ghe-repl-status -vv`.
 8. Stage and checksum the upgrade package.
 9. Enable maintenance mode.
 10. Execute `ghe-upgrade`, tolerate the expected SSH interruption, and reconnect.
@@ -82,7 +83,8 @@ ansible-playbook -i examples/inventory.yml examples/upgrade.yml
 
 | Variable | Purpose |
 |---|---|
-| `ghes_upgrade_topology` | `standalone` or `ha_primary` |
+| `ghes_upgrade_topology` | `standalone`, `ha_primary`, or `ha_replica` |
+| `ghes_upgrade_ha_orchestrated` | Require the guarded multi-play HA workflow |
 | `ghes_upgrade_expected_current_version` | Prevents upgrading an unexpected appliance version |
 | `ghes_upgrade_target_version` | Exact version expected after reboot |
 | `ghes_upgrade_package_local_path` | Package on the Ansible controller |
@@ -93,7 +95,18 @@ ansible-playbook -i examples/inventory.yml examples/upgrade.yml
 
 ## HA note
 
-This role checks replication when `ghes_upgrade_topology: ha_primary`, but it does not upgrade replicas. Use a parent playbook to orchestrate GitHub's required primary/replica ordering for your exact GHES release and HA design.
+The included `examples/upgrade_ha.yml` playbook uses the role's `ha_preflight`,
+`ha_prepare`, and `ha_finalize` task entry points to:
+
+1. Preflight every appliance before disruption.
+2. Verify replication, enable maintenance mode, and stop all replication.
+3. Upgrade the primary.
+4. Upgrade replicas serially.
+5. Restart and validate replication before disabling maintenance mode.
+
+This workflow is for GHES HA or geo-replication appliances. GitHub Enterprise
+Server Clustering uses different commands and node ordering and remains
+unsupported by this role.
 
 ## Package and upgrade-path validation
 

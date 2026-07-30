@@ -1,0 +1,8 @@
+---
+- name: Create HA test instances
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Record that delegated instances are ready
+      ansible.builtin.debug:
+        msg: "Using three local Molecule inventory hosts."

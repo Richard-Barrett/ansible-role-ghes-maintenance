@@ -1,0 +1,8 @@
+---
+- name: Destroy HA test instances
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Record that no delegated resources need destruction
+      ansible.builtin.debug:
+        msg: "The local Molecule instances have no external resources."

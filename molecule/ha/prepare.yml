@@ -1,0 +1,92 @@
+---
+- name: Prepare mocked HA appliances
+  hosts: all
+  gather_facts: false
+  vars:
+    molecule_ha_root: "/tmp/ansible-role-ghes-maintenance-ha"
+    molecule_ha_node_root: "{{ molecule_ha_root }}/{{ inventory_hostname }}"
+    molecule_ha_bin: "{{ molecule_ha_node_root }}/bin"
+  tasks:
+    - name: Create mocked appliance directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ molecule_ha_bin }}"
+        - "{{ molecule_ha_node_root }}/artifacts"
+        - "{{ molecule_ha_node_root }}/async"
+
+    - name: Set the initial mocked GHES version
+      ansible.builtin.copy:
+        dest: "{{ molecule_ha_node_root }}/version"
+        content: "3.20.4\n"
+        mode: "0644"
+
+    - name: Create a mocked upgrade package
+      ansible.builtin.copy:
+        dest: "{{ molecule_ha_node_root }}/github-enterprise-3.21.1.pkg"
+        content: "mock GHES HA upgrade package\n"
+        mode: "0644"
+
+    - name: Install common mocked GHES commands
+      ansible.builtin.copy:
+        dest: "{{ molecule_ha_bin }}/{{ item.name }}"
+        content: "{{ item.content }}"
+        mode: "0755"
+      loop:
+        - name: ghe-version
+          content: |
+            #!/bin/sh
+            printf 'GitHub Enterprise Server %s\n' "$(cat "${MOCK_GHES_NODE_ROOT}/version")"
+        - name: ghe-config-check
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'Configuration is valid'
+        - name: ghe-check-background-upgrade-jobs
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'All background upgrade jobs are complete'
+        - name: ghe-check-disk-usage
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'Disk usage checks passed'
+        - name: ghe-upgrade
+          content: |
+            #!/bin/sh
+            printf '%s\n' "${MOCK_GHES_TARGET_VERSION}" > "${MOCK_GHES_NODE_ROOT}/version"
+            printf 'upgrade:%s\n' "${MOCK_GHES_NODE}" >> "${MOCK_GHES_ROOT}/events.log"
+        - name: ghe-maintenance
+          content: |
+            #!/bin/sh
+            printf 'maintenance:%s\n' "$*" >> "${MOCK_GHES_ROOT}/events.log"
+        - name: ghe-repl-stop-all
+          content: |
+            #!/bin/sh
+            touch "${MOCK_GHES_ROOT}/replication-stopped"
+            rm -f "${MOCK_GHES_ROOT}/replication-started"
+            printf '%s\n' 'replication:stop-all' >> "${MOCK_GHES_ROOT}/events.log"
+        - name: ghe-repl-start-all
+          content: |
+            #!/bin/sh
+            touch "${MOCK_GHES_ROOT}/replication-started"
+            printf '%s\n' 'replication:start-all' >> "${MOCK_GHES_ROOT}/events.log"
+        - name: ghe-repl-status
+          content: |
+            #!/bin/sh
+            if [ -e "${MOCK_GHES_ROOT}/replication-stopped" ] &&
+               [ ! -e "${MOCK_GHES_ROOT}/replication-started" ]; then
+              printf '%s\n' 'CRITICAL: replication is stopped'
+              exit 2
+            fi
+            printf '%s\n' 'OK: replication is healthy'
+        - name: df
+          content: |
+            #!/bin/sh
+            printf '%s\n' 'Filesystem 1048576-blocks Used Available Capacity Mounted on'
+            for argument in "$@"; do
+              case "$argument" in
+                -*) ;;
+                *) printf 'mockfs 100000 1000 99000 1%% %s\n' "$argument" ;;
+              esac
+            done

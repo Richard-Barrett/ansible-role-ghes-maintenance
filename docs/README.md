@@ -148,17 +148,50 @@ upgrade.
 
 ## High availability
 
-For an HA primary, enable replication validation:
+The role supports an orchestrated HA configuration with one primary and one or
+more replicas. This is not GitHub Enterprise Server Clustering.
+
+Create `ghes_primary` and `ghes_replicas` inventory groups, as shown in
+`examples/inventory.yml`. Put the shared upgrade inputs in group variables:
 
 ```yaml
-ghes_upgrade_topology: "ha_primary"
-ghes_upgrade_validate_replication: true
+ghes_upgrade_expected_current_version: "3.20.4"
+ghes_upgrade_target_version: "3.21.1"
+ghes_upgrade_package_remote_path: "/home/admin/github-enterprise-3.21.1.pkg"
+ghes_upgrade_backup_confirmed: true
+ghes_upgrade_snapshot_confirmed: true
 ```
 
-The role runs `ghe-repl-status -vv` before and after the primary upgrade. It
-does not upgrade a replica or determine the correct HA sequence. Put this role
-inside a separately reviewed orchestration playbook that follows the procedure
-for the exact GHES release and deployment design.
+Then review and run `examples/upgrade_ha.yml`. It performs these phases:
+
+1. Validate the package, version, configuration, capacity, and required
+   utilities on every appliance without changing HA state.
+2. On the primary, require healthy replication, enter maintenance mode, and
+   run `ghe-repl-stop-all`.
+3. Upgrade the primary and wait for its post-upgrade validation to complete.
+4. Upgrade every host in `ghes_replicas` with `serial: 1`.
+5. On the primary, run `ghe-repl-start-all`, wait for `ghe-repl-status -vv` to
+   return successfully, and only then exit maintenance mode.
+
+```bash
+ansible-playbook -i inventory/production.yml examples/upgrade_ha.yml
+```
+
+The primary and replica upgrade plays set
+`ghes_upgrade_manage_maintenance: false` and
+`ghes_upgrade_validate_replication: false` because replication is intentionally
+stopped and the outer phases own those states. The role rejects an
+`ha_replica` invocation without these guardrails.
+
+If any node upgrade or final replication check fails, the final play does not
+run. Maintenance therefore remains enabled and replication remains stopped for
+operator investigation. Do not manually continue with a different node until
+the failed primary configuration or node upgrade is understood.
+
+The HA sequence applies to feature-release `.pkg` upgrades in the documented
+primary-first workflow. Hotpatch `.hpkg` upgrades and actual GHES clusters have
+different procedures. Always review the documentation and release notes for
+the installed and target GHES versions before execution.
 
 The `cluster` topology is rejected because clustered upgrades use a different
 procedure.
@@ -217,8 +250,11 @@ according to your organization's retention and access policies.
 | `ghes_upgrade_confirm` | `false` | Required explicit approval gate. |
 | `ghes_upgrade_expected_current_version` | `""` | Optional exact current-version guard. |
 | `ghes_upgrade_target_version` | `""` | Required exact version expected after upgrade. |
-| `ghes_upgrade_topology` | `standalone` | Supported values are `standalone` and `ha_primary`. |
-| `ghes_upgrade_validate_replication` | `true` | Check replication for an HA primary. |
+| `ghes_upgrade_topology` | `standalone` | `standalone`, `ha_primary`, or guarded `ha_replica`. |
+| `ghes_upgrade_validate_replication` | `true` | Check replication for a non-orchestrated HA primary. |
+| `ghes_upgrade_ha_orchestrated` | `false` | Confirm the role is called by the HA multi-play workflow. |
+| `ghes_upgrade_replication_retries` | `60` | HA replication health-check attempts. |
+| `ghes_upgrade_replication_delay` | `10` | Seconds between HA replication checks. |
 | `ghes_upgrade_manage_maintenance` | `true` | Enable and disable maintenance mode. |
 | `ghes_upgrade_maintenance_message` | upgrade message | Message shown while maintenance mode is active. |
 | `ghes_upgrade_leave_maintenance_on_failure` | `true` | Documents the safe failure policy. |

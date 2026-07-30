@@ -13,9 +13,15 @@ ghes_upgrade_confirm: false
 ghes_upgrade_expected_current_version: ""
 ghes_upgrade_target_version: ""
 
-# Topology: standalone or ha_primary. Cluster upgrades are intentionally rejected.
+# Topology: standalone, ha_primary, or ha_replica. GHES clustering is rejected.
 ghes_upgrade_topology: "standalone"
 ghes_upgrade_validate_replication: true
+
+# HA orchestration. A parent playbook calls the ha_prepare and ha_finalize task
+# entry points on the primary and invokes the main role once per appliance.
+ghes_upgrade_ha_orchestrated: false
+ghes_upgrade_replication_retries: 60
+ghes_upgrade_replication_delay: 10
 
 # Maintenance mode handling.
 ghes_upgrade_manage_maintenance: true

@@ -1,7 +1,19 @@
 ---
 all:
-  hosts:
-    ghes-primary:
-      ansible_host: github.example.com
-      ansible_user: admin
-      ansible_port: 122
+  children:
+    ghes_primary:
+      hosts:
+        ghes-primary:
+          ansible_host: github.example.com
+          ansible_user: admin
+          ansible_port: 122
+    ghes_replicas:
+      hosts:
+        ghes-replica-1:
+          ansible_host: replica-1.github.example.com
+          ansible_user: admin
+          ansible_port: 122
+        ghes-replica-2:
+          ansible_host: replica-2.github.example.com
+          ansible_user: admin
+          ansible_port: 122

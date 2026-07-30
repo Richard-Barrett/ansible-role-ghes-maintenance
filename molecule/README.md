@@ -7,8 +7,10 @@ a licensed GHES image, or access to an appliance.
   verifies the version change, maintenance-mode transitions, and evidence files.
 - `guardrails` verifies that missing confirmation and cluster topology are
   rejected before any appliance command runs.
+- `ha` models a primary and two replicas and verifies maintenance, replication,
+  and serial node-upgrade ordering.
 
-Run both scenarios with:
+Run all scenarios with:
 
 ```bash
 make molecule

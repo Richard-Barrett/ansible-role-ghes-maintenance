@@ -23,7 +23,7 @@ ARCHIVE_NAME ?= ansible-role-ghes-maintenance.tar.gz
 
 .PHONY: help setup deps hooks check-tools \
 	lint lint-yaml lint-ansible syntax pre-commit \
-	test molecule molecule-default molecule-guardrails \
+	test molecule molecule-default molecule-guardrails molecule-ha \
 	molecule-create molecule-converge molecule-idempotence molecule-verify molecule-destroy molecule-reset \
 	upgrade-check upgrade service-status restart-core-services \
 	package clean clean-cache clean-molecule clean-dist
@@ -76,6 +76,7 @@ lint-ansible: deps ## Run ansible-lint against the role and examples
 
 syntax: deps ## Run Ansible syntax checks for example playbooks
 	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $(UPGRADE_PLAYBOOK) --syntax-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) examples/upgrade_ha.yml --syntax-check
 	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $(SERVICE_PLAYBOOK) --syntax-check
 
 pre-commit: deps ## Run every configured pre-commit hook against all files
@@ -83,13 +84,16 @@ pre-commit: deps ## Run every configured pre-commit hook against all files
 
 test: lint syntax molecule ## Run static analysis, syntax checks, and all Molecule scenarios
 
-molecule: molecule-default molecule-guardrails ## Run all Molecule scenarios
+molecule: molecule-default molecule-guardrails molecule-ha ## Run all Molecule scenarios
 
 molecule-default: deps ## Run the successful mocked GHES upgrade scenario
 	$(MOLECULE) test -s default
 
 molecule-guardrails: deps ## Run unsafe-input and unsupported-topology guardrail tests
 	$(MOLECULE) test -s guardrails
+
+molecule-ha: deps ## Run the three-node mocked HA upgrade scenario
+	$(MOLECULE) test -s ha
 
 molecule-create: deps ## Create the selected Molecule scenario resources
 	$(MOLECULE) create -s $(SCENARIO)
@@ -157,6 +161,7 @@ clean-molecule: ## Destroy Molecule scenarios and remove local Molecule state
 	@if [ -x "$(MOLECULE)" ]; then \
 		$(MOLECULE) destroy -s default || true; \
 		$(MOLECULE) destroy -s guardrails || true; \
+		$(MOLECULE) destroy -s ha || true; \
 	fi
 	rm -rf .molecule
 

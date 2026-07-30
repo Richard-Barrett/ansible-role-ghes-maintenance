@@ -2,7 +2,14 @@
 - name: Verify required GHES utilities exist
   ansible.builtin.shell: |
     set -o pipefail
-    for command in ghe-version ghe-config-check ghe-maintenance {{ ghes_upgrade_command }}; do
+    required_commands=(ghe-version ghe-config-check {{ ghes_upgrade_command | quote }})
+    {% if ghes_upgrade_manage_maintenance | bool %}
+    required_commands+=(ghe-maintenance)
+    {% endif %}
+    {% if ghes_upgrade_validate_replication | bool and ghes_upgrade_topology == 'ha_primary' %}
+    required_commands+=(ghe-repl-status)
+    {% endif %}
+    for command in "${required_commands[@]}"; do
       command -v "$command" >/dev/null 2>&1 || { echo "Missing $command" >&2; exit 1; }
     done
   args:

@@ -46,11 +46,35 @@
         - name: Verify cluster topology was rejected
           ansible.builtin.assert:
             that:
-              - "'supports standalone appliances and HA primary nodes only' in ansible_failed_result.msg"
+              - "'GHES clusters require the cluster-specific procedure' in ansible_failed_result.msg"
 
         - name: Record topology guardrail success
           ansible.builtin.set_fact:
             molecule_topology_guardrail_passed: true
+
+    - name: Refuse an uncoordinated HA replica upgrade
+      block:
+        - name: Invoke role directly on an HA replica
+          ansible.builtin.include_role:
+            name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+          vars:
+            ghes_upgrade_confirm: true
+            ghes_upgrade_target_version: "3.21.1"
+            ghes_upgrade_topology: "ha_replica"
+            ghes_upgrade_package_remote_path: "{{ molecule_test_root }}/upgrade.pkg"
+
+        - name: Fail when an uncoordinated replica was accepted
+          ansible.builtin.fail:
+            msg: "The role accepted an uncoordinated HA replica upgrade."
+      rescue:
+        - name: Verify uncoordinated replica upgrade was rejected
+          ansible.builtin.assert:
+            that:
+              - "'HA replicas must be upgraded by the documented HA orchestration workflow' in ansible_failed_result.msg"
+
+        - name: Record replica guardrail success
+          ansible.builtin.set_fact:
+            molecule_replica_guardrail_passed: true
 
     - name: Create guardrail result directory
       ansible.builtin.file:
@@ -66,3 +90,4 @@
           ---
           confirmation: {{ molecule_confirmation_guardrail_passed | default(false) | bool | lower }}
           topology: {{ molecule_topology_guardrail_passed | default(false) | bool | lower }}
+          replica: {{ molecule_replica_guardrail_passed | default(false) | bool | lower }}

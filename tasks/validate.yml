@@ -10,10 +10,35 @@
 - name: Validate supported topology
   ansible.builtin.assert:
     that:
-      - ghes_upgrade_topology in ['standalone', 'ha_primary']
+      - ghes_upgrade_topology in ['standalone', 'ha_primary', 'ha_replica']
     fail_msg: >-
-      This role supports standalone appliances and HA primary nodes only.
-      GHES clusters require the cluster-specific upgrade procedure.
+      This role supports standalone appliances and orchestrated HA primary or
+      replica nodes. GHES clusters require the cluster-specific procedure.
+
+- name: Require the HA workflow for replica upgrades
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_ha_orchestrated | bool
+      - not (ghes_upgrade_manage_maintenance | bool)
+      - not (ghes_upgrade_validate_replication | bool)
+    fail_msg: >-
+      HA replicas must be upgraded by the documented HA orchestration workflow.
+      Set ghes_upgrade_ha_orchestrated=true, ghes_upgrade_manage_maintenance=false,
+      and ghes_upgrade_validate_replication=false in the serial replica play.
+  when: ghes_upgrade_topology == 'ha_replica'
+
+- name: Require externally managed state during an orchestrated primary upgrade
+  ansible.builtin.assert:
+    that:
+      - not (ghes_upgrade_manage_maintenance | bool)
+      - not (ghes_upgrade_validate_replication | bool)
+    fail_msg: >-
+      The HA prepare/finalize phases own maintenance and replication state.
+      Set ghes_upgrade_manage_maintenance=false and
+      ghes_upgrade_validate_replication=false for the primary upgrade.
+  when:
+    - ghes_upgrade_topology == 'ha_primary'
+    - ghes_upgrade_ha_orchestrated | bool
 
 - name: Require target version
   ansible.builtin.assert:

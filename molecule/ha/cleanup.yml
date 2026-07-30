@@ -1,0 +1,9 @@
+---
+- name: Clean up mocked HA state
+  hosts: ghes_primary
+  gather_facts: false
+  tasks:
+    - name: Remove the HA scenario test directory
+      ansible.builtin.file:
+        path: "/tmp/ansible-role-ghes-maintenance-ha"
+        state: absent

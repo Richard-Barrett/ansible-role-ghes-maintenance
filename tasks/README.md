@@ -14,3 +14,9 @@ The task files execute in this order:
 The order is safety-sensitive. New tasks should fail with actionable messages,
 avoid logging secrets, and preserve maintenance mode when post-upgrade health
 cannot be established.
+
+For HA upgrades, `ha_preflight.yml` validates every node before disruption,
+`ha_prepare.yml` runs on the primary before any node upgrade, and
+`ha_finalize.yml` runs on the primary after every replica is upgraded. These
+entry points deliberately leave maintenance enabled and replication stopped if
+an intervening upgrade or health check fails.

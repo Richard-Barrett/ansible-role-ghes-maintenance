@@ -21,6 +21,10 @@ provisioner:
         ansible_connection: local
         ansible_async_dir: "/tmp/ansible-role-ghes-maintenance-default/async"
         ansible_python_interpreter: "{{ ansible_playbook_python }}"
+        ansible_remote_tmp: "/tmp/ansible-role-ghes-maintenance-default-remote"
+      localhost:
+        ansible_connection: local
+        ansible_remote_tmp: "/tmp/ansible-role-ghes-maintenance-default-controller"
 
 verifier:
   name: ansible

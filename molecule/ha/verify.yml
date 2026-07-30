@@ -1,0 +1,41 @@
+---
+- name: Verify HA workflow
+  hosts: ghes_primary
+  gather_facts: false
+  vars:
+    molecule_ha_root: "/tmp/ansible-role-ghes-maintenance-ha"
+  tasks:
+    - name: Read HA workflow events
+      ansible.builtin.slurp:
+        src: "{{ molecule_ha_root }}/events.log"
+      register: molecule_ha_events
+
+    - name: Read upgraded versions
+      ansible.builtin.slurp:
+        src: "{{ molecule_ha_root }}/{{ item }}/version"
+      loop:
+        - ghes-ha-primary
+        - ghes-ha-replica-1
+        - ghes-ha-replica-2
+      register: molecule_ha_versions
+
+    - name: Verify HA ordering and versions
+      ansible.builtin.assert:
+        that:
+          - >-
+            (molecule_ha_events.content | b64decode).splitlines() == [
+              'maintenance:-s GitHub Enterprise Server is being upgraded.',
+              'replication:stop-all',
+              'upgrade:ghes-ha-primary',
+              'upgrade:ghes-ha-replica-1',
+              'upgrade:ghes-ha-replica-2',
+              'replication:start-all',
+              'maintenance:-u'
+            ]
+          - >-
+            molecule_ha_versions.results
+            | map(attribute='content')
+            | map('b64decode')
+            | map('trim')
+            | list == ['3.21.1', '3.21.1', '3.21.1']
+        fail_msg: "The HA upgrade did not preserve the required node ordering."

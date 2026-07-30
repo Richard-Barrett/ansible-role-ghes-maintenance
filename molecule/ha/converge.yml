@@ -1,0 +1,102 @@
+---
+- name: Preflight HA nodes
+  hosts: all
+  gather_facts: false
+  environment: &ha_environment
+    MOCK_GHES_ROOT: "/tmp/ansible-role-ghes-maintenance-ha"
+    MOCK_GHES_NODE_ROOT: "/tmp/ansible-role-ghes-maintenance-ha/{{ inventory_hostname }}"
+    MOCK_GHES_NODE: "{{ inventory_hostname }}"
+    MOCK_GHES_TARGET_VERSION: "3.21.1"
+    PATH: "/tmp/ansible-role-ghes-maintenance-ha/{{ inventory_hostname }}/bin:{{ lookup('ansible.builtin.env', 'PATH') }}"
+  vars:
+    ghes_upgrade_confirm: true
+    ghes_upgrade_topology: >-
+      {{ 'ha_primary' if inventory_hostname in groups['ghes_primary'] else 'ha_replica' }}
+    ghes_upgrade_ha_orchestrated: true
+    ghes_upgrade_manage_maintenance: false
+    ghes_upgrade_validate_replication: false
+    ghes_upgrade_expected_current_version: "3.20.4"
+    ghes_upgrade_target_version: "3.21.1"
+    ghes_upgrade_package_remote_path: >-
+      /tmp/ansible-role-ghes-maintenance-ha/{{ inventory_hostname }}/github-enterprise-3.21.1.pkg
+    ghes_upgrade_backup_confirmed: true
+    ghes_upgrade_snapshot_confirmed: true
+    ghes_upgrade_artifact_dir: >-
+      /tmp/ansible-role-ghes-maintenance-ha/{{ inventory_hostname }}/artifacts
+  tasks:
+    - name: Validate every HA node before disruption
+      ansible.builtin.include_role:
+        name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: ha_preflight
+
+- name: Prepare HA state
+  hosts: ghes_primary
+  gather_facts: false
+  environment: *ha_environment
+  tasks:
+    - name: Enter maintenance mode and stop replication
+      ansible.builtin.include_role:
+        name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: ha_prepare
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: "ha_primary"
+        ghes_upgrade_ha_orchestrated: true
+        ghes_upgrade_target_version: "3.21.1"
+        ghes_upgrade_backup_confirmed: true
+        ghes_upgrade_snapshot_confirmed: true
+        ghes_upgrade_replication_retries: 2
+        ghes_upgrade_replication_delay: 0
+
+- name: Upgrade HA primary
+  hosts: ghes_primary
+  gather_facts: false
+  environment: *ha_environment
+  vars:
+    <<: &upgrade_variables
+      ghes_upgrade_confirm: true
+      ghes_upgrade_ha_orchestrated: true
+      ghes_upgrade_manage_maintenance: false
+      ghes_upgrade_validate_replication: false
+      ghes_upgrade_expected_current_version: "3.20.4"
+      ghes_upgrade_target_version: "3.21.1"
+      ghes_upgrade_package_remote_path: >-
+        /tmp/ansible-role-ghes-maintenance-ha/{{ inventory_hostname }}/github-enterprise-3.21.1.pkg
+      ghes_upgrade_backup_confirmed: true
+      ghes_upgrade_snapshot_confirmed: true
+      ghes_upgrade_connection_delay: 0
+      ghes_upgrade_reboot_timeout: 60
+      ghes_upgrade_background_jobs_timeout: 10
+      ghes_upgrade_background_jobs_poll: 1
+      ghes_upgrade_artifact_dir: >-
+        /tmp/ansible-role-ghes-maintenance-ha/{{ inventory_hostname }}/artifacts
+    ghes_upgrade_topology: "ha_primary"
+  roles:
+    - role: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+
+- name: Upgrade HA replicas serially
+  hosts: ghes_replicas
+  gather_facts: false
+  serial: 1
+  environment: *ha_environment
+  vars:
+    <<: *upgrade_variables
+    ghes_upgrade_topology: "ha_replica"
+  roles:
+    - role: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+
+- name: Finalize HA state
+  hosts: ghes_primary
+  gather_facts: false
+  environment: *ha_environment
+  tasks:
+    - name: Start and validate replication
+      ansible.builtin.include_role:
+        name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: ha_finalize
+      vars:
+        ghes_upgrade_confirm: true
+        ghes_upgrade_topology: "ha_primary"
+        ghes_upgrade_ha_orchestrated: true
+        ghes_upgrade_replication_retries: 2
+        ghes_upgrade_replication_delay: 0

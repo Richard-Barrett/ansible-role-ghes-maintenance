@@ -1,0 +1,45 @@
+---
+- name: Validate HA preparation inputs
+  ansible.builtin.assert:
+    that:
+      - ghes_upgrade_confirm | bool
+      - ghes_upgrade_topology == 'ha_primary'
+      - ghes_upgrade_ha_orchestrated | bool
+      - ghes_upgrade_target_version | length > 0
+      - not (ghes_upgrade_require_backup_confirmation | bool) or (ghes_upgrade_backup_confirmed | bool)
+      - not (ghes_upgrade_require_snapshot_confirmation | bool) or (ghes_upgrade_snapshot_confirmed | bool)
+    fail_msg: >-
+      HA preparation must run on the primary with explicit confirmation,
+      a target version, backup and snapshot confirmation,
+      ghes_upgrade_topology=ha_primary, and ghes_upgrade_ha_orchestrated=true.
+
+- name: Verify HA preparation utilities exist
+  ansible.builtin.shell: |
+    set -o pipefail
+    for command in ghe-maintenance ghe-repl-status ghe-repl-stop-all; do
+      command -v "$command" >/dev/null 2>&1 || { echo "Missing $command" >&2; exit 1; }
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Require healthy replication before HA upgrade
+  ansible.builtin.command: ghe-repl-status -vv
+  register: ghes_upgrade_ha_replication_before
+  changed_when: false
+  failed_when: false
+  until: ghes_upgrade_ha_replication_before.rc == 0
+  retries: "{{ ghes_upgrade_replication_retries }}"
+  delay: "{{ ghes_upgrade_replication_delay }}"
+
+- name: Enable maintenance mode for the HA upgrade
+  ansible.builtin.command:
+    argv:
+      - ghe-maintenance
+      - -s
+      - "{{ ghes_upgrade_maintenance_message }}"
+  changed_when: true
+
+- name: Stop replication on all HA replicas
+  ansible.builtin.command: ghe-repl-stop-all
+  changed_when: true
