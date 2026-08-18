@@ -1,0 +1,48 @@
+---
+ansible:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.yml"
+          - "**/*.yaml"
+
+roles:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "roles/**/*"
+
+playbooks:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "playbooks/**/*"
+
+inventory:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "inventory/**/*"
+          - "inventories/**/*"
+          - "group_vars/**/*"
+          - "host_vars/**/*"
+
+molecule:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "molecule/**/*"
+
+github-actions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**/*"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**/*"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "requirements.yml"
+          - "requirements.yaml"
+          - "collections/requirements.yml"
+          - "collections/requirements.yaml"
